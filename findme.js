@@ -5,11 +5,18 @@ const sgMail = require('@sendgrid/mail');
 const dotenv = require('dotenv');
 const fs = require("fs");
 const https = require("https");
+const admin = require('firebase-admin');
 
 const app = express();
 app.use(bodyParser.urlencoded({extended: true}));
 dotenv.config();
 sgMail.setApiKey(process.env.SENDGRID);
+
+const serviceAccount = require('./serviceAccountKey.json');
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
 
 const corsConfig = {
     origin: "*",
@@ -45,6 +52,27 @@ app.post('/sendEmail', cors(corsConfig), (req, res) => {
         });
 });
 
+app.get('/deleteUser/:email', cors(corsConfig), (req, res)=>{
+    const email = req.params.email;
+    admin.auth().getUserByEmail(email).then((userRecord) => {
+        const uid = userRecord.toJSON()['uid'];
+        console.log(uid);
+        //delete user
+
+        admin.auth().deleteUser(uid).then(() => {
+            console.log('Successfully deleted user');
+            res.send({'status': 'done'});
+        }).catch((error) => {
+            console.log('Error deleting user:', error);
+            res.status(400).send(error.toString());
+        });
+
+    }).catch((error) => {
+        console.log('Error fetching user data:', error);
+        res.status(400).send(error.toString());
+    });
+});
+
 app.get('/', (req, res) => {
     res.send("Hello World!");
 });
@@ -63,5 +91,5 @@ const credentials = {
 
 https.createServer(credentials, app)
     .listen(7000, function () {
-        console.log('Server started on port 5000')
+        console.log('Server started on port 7000')
     })
